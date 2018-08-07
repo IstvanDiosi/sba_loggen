@@ -1,0 +1,38 @@
+#       File            : loggen_test.cf
+#       -----------------------------------------------------------------------------          
+#       Start           : nohup /opt/logstash/bin/logstash -f /opt/ASM/cfg/logstash/loggen_test.cf > /dev/null 2>&1 &
+#       -----------------------------------------------------------------------------
+#       Description     : A coney_inf loggenertator által előállított tesztrekordokat szúrja
+#													be az Elasticsearch-be. 
+#       -----------------------------------------------------------------------------
+#       input           : /home/u95873/loggenerator/tempor.lg A loggenerátor output file-ja
+#       output          : Elasticsearch (10.233.185.14)
+#       filterek        : geoip, translate, ASM_ID generalas
+#       ----------------------------------------------------------------------------
+#       Author          : Istvan Diosi (www.szofiUSA.com)
+#       Created         : 2016.07.21
+#       Modify          : 2016.07.22 lgdb-k befűzése
+#                         2016.07.26 KH-ban történő telepítés
+#                         2016.08.16 ASM_ID generáló ruby script befűzése
+#
+#
+#
+#
+#------------------------------------------------------------------------------------
+input {
+ file {
+	path => "/home/u95873/loggenerator/tempor.lg"
+        start_position => beginning
+        ignore_older => 0 
+    }
+}
+
+        
+
+output {
+         stdout{codec => json}
+ rabbitmq {
+                exchange => "asm"
+                host => "10.238.129.15"
+                exchange_type => "fanout"}											                         
+}

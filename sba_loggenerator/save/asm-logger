@@ -1,0 +1,38 @@
+#!/bin/sh
+#-----------------------------------------------------------------------
+#
+#	A script a logbejegyzéseket generál adott paraméterezéssel.
+#	Tesztelési segédeszközként készült, egy ELK architektúrához
+#
+#	Author		: Istvan Diosi (www.szofiUSA.com)
+#	Created		: 2016.07.21
+#	Modify		: 2016.07.23 lgdb-k befűzése
+#
+#-----------------------------------------------------------------------
+# ================== global variables ==================================
+sp1=' '
+sp2='  '
+coma=','
+#=======================================================================   
+
+proba_counter=0
+ datum=''
+ lgtxt=''
+ user=''
+ ip='' 
+  while [  $proba_counter -lt 1000 ]; 
+         do
+             # ------ get date ------------------------------------
+             datum=$(date -R)
+             # ------ get logmessage ------------------------------
+             lgtxt=$(sort -R ./lgtemplate/equation.lgdb | head -n 1)
+             # ------ get username --------------------------------
+             user=$(sort -R ./lgtemplate/user.lgdb | head -n 1)
+             # ------ get ip -------------------------------------
+             ip=$(sort -R ./lgtemplate/ip.lgdb | head -n 1)
+             # ----------------------------------------------------
+             echo $datum$sp1$lgtxt$sp1$ip$sp1$user >>asm_test.log
+             let proba_counter=proba_counter+1 
+         done
+
+#  sort -R ./lgtemplate/proba.lgdb | head -n 1

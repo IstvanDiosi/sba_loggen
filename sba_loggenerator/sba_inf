@@ -1,0 +1,97 @@
+#!/bin/bash 
+#------------------------------------------------------------------------------------
+#
+#       A script a logbejegyzéseket generál adott paraméterezéssel.
+#       Tesztelési segédeszközként készült az SBA-hoz (Szofi Behavioral Analytics)
+#
+#       Code Name       : sba_inf(inite) 1.1
+#       Description     : 
+#       A script a logsource-okból, amelyek az adott alaprendszer üzeneteit tartalmazzzák
+#       és olyan segédfájlokból, mint az sba_device.lgdb, sba_user.lgdb, etc tetszőlegesen kialakítható
+#	logüzeneteket generál, végtelen ciklusban.
+#	A kód a Bklyn szotochasztikus folymatanalíziséhez írt kód egy részletének 
+#	leegyszerűsítése.  indítás praktikusan: nohup ./sba_inf > /dev/null 2>&1 &
+#
+#       Author          : Istvan Diosi (www.szofiUSA.com)
+#       Created         : 2017.08.03
+#       Modify          : 
+#						                         
+#                          
+#                              
+#                         
+#                         
+#
+#------------------------------------------------------------------------------------
+# ================== global variables ===============================================
+sp1=' '
+sp2='  '
+coma=','
+delay=0
+#====================================================================================
+#----------- Forrásrendszer-logfileok mérete ----------------------------------------
+ browser_filesize=$(cat ./lgtemplate/sba_browser.lgdb |wc -l)
+ os_filesize=$(cat ./lgtemplate/sba_os.lgdb |wc -l)
+ device_filesize=$(cat ./lgtemplate/sba_device.lgdb |wc -l)
+ day_filesize=$(cat ./lgtemplate/sba_day.lgdb |wc -l)
+ hour_filesize=$(cat ./lgtemplate/sba_hour.lgdb |wc -l)
+ userfilesize=$(cat ./lgtemplate/sba_user.lgdb |wc -l)
+ ipfilesize=$(cat ./lgtemplate/sba_ip.lgdb |wc -l)
+#------------------------------------------------------------------------------------
+
+#----------- Egyéb segédváltozók ----------------------------------------------------
+filesize=0
+#------------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------------
+function get_message
+ {
+             # ------ get date ------------------------------------
+             datum=$(date -R)
+       
+             # ------ get ip --------------------------------------
+             iplinenumber=$(((RANDOM % $ipfilesize)+1))
+             ip=$(cat  ./lgtemplate/sba_ip.lgdb |sed -n $iplinenumber' p')
+             # ----------------------------------------------------
+             # ------ get user ------------------------------------
+              userlinenumber=$(((RANDOM % $userfilesize)+1))
+              user=$(cat  ./lgtemplate/sba_user.lgdb |sed -n $userlinenumber' p')
+             # ----------------------------------------------------
+             #------ get browser ----------------------------------
+              browserlinenumber=$(((RANDOM % $browser_filesize)+1))
+              browser=$(cat  ./lgtemplate/sba_browser.lgdb |sed -n $browserlinenumber' p')
+             # ----------------------------------------------------
+             #------ get os ---------------------------------------
+              oslinenumber=$(((RANDOM % $os_filesize)+1))
+              os=$(cat  ./lgtemplate/sba_os.lgdb |sed -n $oslinenumber' p')
+             # ----------------------------------------------------
+             #------ get device -----------------------------------
+              devicelinenumber=$(((RANDOM % $device_filesize)+1))
+              device=$(cat  ./lgtemplate/sba_device.lgdb |sed -n $devicelinenumber' p')
+             # ----------------------------------------------------
+             #------ get day --------------------------------------
+              daylinenumber=$(((RANDOM % $day_filesize)+1))
+              day=$(cat  ./lgtemplate/sba_day.lgdb |sed -n $daylinenumber' p')
+             # ----------------------------------------------------
+             #------ get hour -------------------------------------
+              hourlinenumber=$(((RANDOM % $hour_filesize)+1))
+              hour=$(cat  ./lgtemplate/sba_hour.lgdb |sed -n $hourlinenumber' p')
+             # ----------------------------------------------------
+
+	    # echo $datum$sp1$ip$sp1$usersp1$browser$sp1$os$sp1$device$sp1$day$sp1$hour
+             echo $datum$sp1$ip$sp1$user$sp1$browser$sp1$os$sp1$device$sp1$day$sp1$hour >> sba_tempor.lg
+}
+
+
+while true 
+do
+#---------- sba_tempor.lg méretének kordábantartása --------------        
+              filesize=$((filesize+1))
+            
+              if [ $filesize = 1000 ] ; then
+                   rm sba_tempor.lg
+		   filesize=0									
+               fi
+#-------------------------------------------------------------
+             get_message	# egy event generálása az sba_tempor.lg-be
+	     sleep $delay       # a fent beállított késleltetési faktor
+done

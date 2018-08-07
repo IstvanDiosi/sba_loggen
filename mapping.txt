@@ -1,0 +1,155 @@
+index		sba_user_profie 
+Type(s)
+user
+user_location
+user_activity
+user_prev_location
+
+
+
+
+
+diosiistvan@KFKI ~
+$ curl 'http://localhost:9200/sba-user-profile/_mapping?pretty'
+{
+  "sba-user-profile" : {
+    "mappings" : {
+      "user" : {
+        "properties" : {
+          "id" : {
+            "type" : "text"
+          },
+          "last_time" : {
+            "type" : "text"
+          },
+          "number_of_event" : {
+            "type" : "long"
+          },
+          "sba_id" : {
+            "type" : "keyword"
+          }
+        }
+      },
+      "user_location" : {
+        "properties" : {
+          "city_name" : {
+            "type" : "keyword"
+          },
+          "country_code" : {
+            "type" : "keyword"
+          },
+          "country_name" : {
+            "type" : "keyword"
+          },
+          "id" : {
+            "type" : "text"
+          },
+          "ip" : {
+            "type" : "keyword"
+          },
+          "last_time" : {
+            "type" : "text"
+          },
+          "latitude" : {
+            "type" : "double"
+          },
+          "longitude" : {
+            "type" : "double"
+          },
+          "region_name" : {
+            "type" : "keyword"
+          },
+          "sba_id" : {
+            "type" : "keyword"
+          },
+          "user" : {
+            "type" : "keyword"
+          },
+          "user_id" : {
+            "type" : "text",
+            "fields" : {
+              "keyword" : {
+                "type" : "keyword",
+                "ignore_above" : 256
+              }
+            }
+          }
+        }
+      },
+      "user_activity" : {
+        "properties" : {
+          "freq" : {
+            "type" : "long"
+          },
+          "id" : {
+            "type" : "text"
+          },
+          "item_constant" : {
+            "type" : "keyword"
+          },
+          "item_id" : {
+            "type" : "keyword"
+          },
+          "last_time" : {
+            "type" : "text"
+          },
+          "rel_freq" : {
+            "type" : "float"
+          },
+          "sba_id" : {
+            "type" : "keyword"
+          },
+          "user" : {
+            "type" : "keyword"
+          }
+        }
+      },
+      "user_prev_location" : {
+        "properties" : {
+          "id" : {
+            "type" : "text"
+          },
+          "prev_city_name" : {
+            "type" : "keyword"
+          },
+          "prev_country_code" : {
+            "type" : "keyword"
+          },
+          "prev_country_name" : {
+            "type" : "keyword"
+          },
+          "prev_ip" : {
+            "type" : "keyword"
+          },
+          "prev_last_time" : {
+            "type" : "text"
+          },
+          "prev_latitude" : {
+            "type" : "double"
+          },
+          "prev_longitude" : {
+            "type" : "double"
+          },
+          "prev_region_name" : {
+            "type" : "keyword"
+          },
+          "prev_sba_id" : {
+            "type" : "keyword"
+          },
+          "user" : {
+            "type" : "keyword"
+          },
+          "user_id" : {
+            "type" : "text",
+            "fields" : {
+              "keyword" : {
+                "type" : "keyword",
+                "ignore_above" : 256
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

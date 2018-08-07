@@ -1,0 +1,6 @@
+RULE_USER [xywXYW][0-9]{5}
+RULE_OS Windows7|Windows10|Windows8|WindowsXP|LinuxUbuntuDesktop|MAcOS8|MAcOS9|iOS10|Android|LinuxRedHatDesktop
+RULE_DEVICE DEV[0-9]{4}
+RULE_BROWSER Chrome|IExplorer11|IExplorer10|Firefox|Safari|Opera
+RULE_HOUR h[0-9]{2}
+RULE_DAY d[1-7]{1}

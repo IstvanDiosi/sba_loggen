@@ -1,0 +1,714 @@
+#       File            : loggen_test.cf
+#       -----------------------------------------------------------------------------          
+#       Start           : nohup /opt/logstash/bin/logstash -f /opt/ASM/cfg/logstash/loggen_test.cf > /dev/null 2>&1 &
+#       -----------------------------------------------------------------------------
+#       Description     : A coney_inf loggenertator által előállított tesztrekordokat szúrja
+#													be az Elasticsearch-be. 
+#       -----------------------------------------------------------------------------
+#       input           : /home/u95873/loggenerator/tempor.lg A loggenerátor output file-ja
+#       output          : Elasticsearch (10.233.185.14)
+#       filterek        : geoip, translate, ASM_ID generalas
+#       ----------------------------------------------------------------------------
+#       Author          : Istvan Diosi (www.szofiUSA.com)
+#       Created         : 2016.07.21
+#       Modify          : 2016.07.22 lgdb-k befűzése
+#                         2016.07.26 KH-ban történő telepítés
+#                         2016.08.16 ASM_ID generáló ruby script befűzése
+#
+#
+#
+#
+#------------------------------------------------------------------------------------
+input {
+ file {
+	# path => "/home/diosiistvan/sba/sba_loggenerator/sba_tempor.lg"
+	path => "C:\cygwin64\home\diosiistvan\sba\sba_loggenerator\sba_tempor.lg"
+        start_position => beginning
+        ignore_older => 0 
+    }
+}
+
+
+# geoip path /usr/share/GeoIP
+
+ filter {
+
+	#------------------------ IP infók ---------------------------------------------------------
+          grok {
+		#https://github.com/elastic/logstash/blob/v1.4.2/patterns/grok-patterns
+
+                   match => { "message" => "%{IPV4:ip_address}" }
+               }
+
+          grok {
+    
+                match => { "message" => "%{MONTH:month}" }
+    
+
+               }
+          grok {
+                    match => { "message" => "%{DAY:day}" }
+    
+               }
+          grok {
+                    match => { "message" => "%{MONTHDAY:month_day}" }
+
+               }
+
+
+	grok {
+         	 patterns_dir => "C:\cygwin64\home\diosiistvan\sba\sba_loggenerator\pattern_lib"
+                 match => { "message" => "%{RULE_USER:user_id}" }
+	      }
+
+        grok {
+                 patterns_dir => "C:\cygwin64\home\diosiistvan\sba\sba_loggenerator\pattern_lib"
+                 match => { "message" => "%{RULE_OS:os_id}" }
+              }
+
+        grok {
+                 patterns_dir => "C:\cygwin64\home\diosiistvan\sba\sba_loggenerator\pattern_lib"
+                 match => { "message" => "%{RULE_DEVICE:device_id}" }
+              }
+
+        grok {
+                 patterns_dir => "C:\cygwin64\home\diosiistvan\sba\sba_loggenerator\pattern_lib"
+                 match => { "message" => "%{RULE_BROWSER:browser_id}" }
+              }
+
+       grok {
+                 patterns_dir => "C:\cygwin64\home\diosiistvan\sba\sba_loggenerator\pattern_lib"
+                 match => { "message" => "%{RULE_HOUR:hour_of_day}" }
+              }
+
+
+       grok {
+                 patterns_dir => "C:\cygwin64\home\diosiistvan\sba\sba_loggenerator\pattern_lib"
+                 match => { "message" => "%{RULE_DAY:day_of_month}" }
+              }
+
+
+        geoip {
+                        source => "ip_address"
+                        target => "geoip"
+			database => "C:\cygwin64\usr\share\GeoIP\GeoLite2-City.mmdb"
+                      #  database => "C:\cygwin64\usr\share\GeoIP\GeoLiteCity.dat"
+                        add_field => [ "[geoip][coordinates]", "%{[geoip][longitude]}" ]
+                        add_field => [ "[geoip][coordinates]", "%{[geoip][latitude]}"  ]
+                }
+
+        mutate {
+                        convert => [ "[geoip][coordinates]", "float"]
+                }
+
+
+       #------------------------ event_id ---------------------------------------------------------
+ ruby {
+      init => "require 'time'"
+      code => 'id="#"
+            time = Time.new
+idtime = (time.year).to_s + (time.month).to_s + (time.day).to_s + (time.hour).to_s + (time.min).to_s + (time.sec).to_s + (time.usec).to_s
+                i = 0
+                while i<10 do
+                        rcode=rand(57)+65
+                        case rcode
+                                when 65..90
+                                        sid=rcode.chr()
+                                        id=id+sid
+                                        i+=1
+                                when 97..122
+                                        sid=rcode.chr()
+                                        id=id+sid
+                                        i+=1
+                        end
+                end
+	   event.set("sba_id",idtime + id)
+           '
+         } #ruby
+
+
+
+# --------- sba-user-profile/user updatelése -----------------------------------------
+
+ruby {
+	init => "require 'rubygems'
+		 require 'time'
+		 require 'elasticsearch'
+		 require 'json'"
+code =>'
+
+p_user_id 	= event.get("user_id")
+p_last_time  	= Time.new
+
+
+client = Elasticsearch::Client.new host:"127.0.0.1:9200"
+
+#--------- logadatok átvétele --------------------------------------------------------
+p_sba_id        = event.get("sba_id")
+p_device_id     = event.get("device_id")
+p_os_id         = event.get("p_os_id")
+p_browser_id    = event.get("browser_id")
+p_hour_of_day   = event.get("hour_of_day")
+p_day_of_month  = event.get("day_of_month")
+p_ip_address    = event.get("ip_address")
+p_geoip		= event.get("geoip")
+
+if p_device_id          == nil then p_device_id = "NA" end
+if p_os_id              == nil then p_os_id = "NA" end
+if p_browser_id         == nil then p_browser_id = "NA" end
+if p_hour_of_day        == nil then p_hour_of_day = "NA" end
+if p_day_of_month       == nil then p_day_of_month = "NA" end
+if p_ip_address         == nil then p_ip_address = "NA" end
+
+#--------------------------------------------------------------------------------
+#-------- user karbantartása ----------------------------------------------------
+#--------------------------------------------------------------------------------
+if client.exists? index:"sba-user-profile", type:"user", id:p_user_id
+then
+
+        #---------- update --------------------------------------------------------
+        # kiolvasom a létező rekordot és áttöltöm a releváns változótartalmakat
+        #--------------------------------------------------------------------------
+        response = client.search index:"sba-user-profile", type:"user",
+                body:{
+                        query:{match:{_id:p_user_id}}
+                        }
+
+        response        = response.to_json
+        parsed_response = JSON.parse(response)
+
+        #------ áttöltés ---------------------------------------------------------
+        result                  = parsed_response["hits"]["hits"][0]["_source"]
+        p_number_of_event       = parsed_response["hits"]["hits"][0]["_source"]["number_of_event"]
+	
+        #------ inkrementálom az adott user osszes aktivitásának a számát --------
+         p_number_of_event+=1
+
+        #-------- update ---------------------------------------------------------
+         client.update index:"sba-user-profile", type:"user", id:p_user_id,
+                body:{ doc: {
+                                number_of_event:p_number_of_event,
+				last_time:p_last_time,
+				id:p_user_id,
+ 				sba_id:p_sba_id
+                            }
+                      }
+else
+#---------- insert ------------------------------------------
+ client.index index:"sba-user-profile", type:"user", id:p_user_id,
+                body:{
+                        number_of_event:1,
+			last_time:p_last_time,
+			id:p_user_id,
+			sba_id:p_sba_id
+
+
+                      }
+end
+
+
+#--------------------------------------------------------------------------------
+#-------- user_activity karbantartása -------------------------------------------
+#--------------------------------------------------------------------------------
+
+#================== DEVICE statistic ============================================
+p_device_id     = event.get("device_id")
+
+key = p_user_id+"#"+"client_device"+"#"+p_device_id
+
+
+if client.exists? index:"sba-user-profile", type:"user_activity", id:key
+then
+	response = client.search index:"sba-user-profile", type:"user_activity",
+                body:{
+                        query:{match:{_id:key}}
+                        }
+
+        response        = response.to_json
+        parsed_response = JSON.parse(response)
+ #------ áttöltés ---------------------------------------------------------
+        result      = parsed_response["hits"]["hits"][0]["_source"]
+        
+	p_freq	    = parsed_response["hits"]["hits"][0]["_source"]["freq"]
+	p_rel_freq  = parsed_response["hits"]["hits"][0]["_source"]["rel_freq"]
+
+	p_freq 	    = p_freq.to_f
+	p_rel_freq  = p_rel_freq.to_f
+
+        #------ inkrementálom az adott user osszes aktivitásának a számát --------
+         p_freq+=1
+	 p_rel_freq = p_freq/p_number_of_event
+	 p_rel_freq = p_rel_freq.to_f
+	 
+        #-------- update ---------------------------------------------------------
+         client.update index:"sba-user-profile", type:"user_activity", id:key,
+                body:{ doc: {
+                                freq:p_freq,
+				rel_freq:p_rel_freq,
+				sba_id:p_sba_id,
+				last_time:p_last_time,
+				id:key,
+				user:p_user_id,
+				item_constant:"client_device",
+				item_id:p_device_id			
+                            }
+                      }
+
+else
+ #---------- insert ------------------------------------------
+ 	client.index index:"sba-user-profile", type:"user_activity", id:key,
+                body:{
+                        freq:1,
+			rel_freq:1,
+			sba_id:p_sba_id,
+			last_time:p_last_time,
+			id:key,
+                        user:p_user_id,
+                        item_constant:"client_device",
+                        item_id:p_device_id
+			}
+
+
+end # if exist in device
+
+
+
+#================== OS statistic ==============================================
+key = p_user_id+"#"+"client_os"+"#"+p_os_id
+
+if client.exists? index:"sba-user-profile", type:"user_activity", id:key
+then
+        response = client.search index:"sba-user-profile", type:"user_activity",
+                body:{
+                        query:{match:{_id:key}}
+                        }
+
+        response        = response.to_json
+        parsed_response = JSON.parse(response)
+ #------ áttöltés ---------------------------------------------------------
+        result      = parsed_response["hits"]["hits"][0]["_source"]
+
+        p_freq      = parsed_response["hits"]["hits"][0]["_source"]["freq"]
+        p_rel_freq  = parsed_response["hits"]["hits"][0]["_source"]["rel_freq"]
+
+        p_freq      = p_freq.to_f
+        p_rel_freq  = p_rel_freq.to_f
+
+        #------ inkrementálom az adott user osszes aktivitásának a számát --------
+         p_freq+=1
+         p_rel_freq = p_freq/p_number_of_event
+         p_rel_freq = p_rel_freq.to_f
+
+        #-------- update ---------------------------------------------------------
+         client.update index:"sba-user-profile", type:"user_activity", id:key,
+                body:{ doc: {
+                                freq:p_freq,
+                                rel_freq:p_rel_freq,
+                                sba_id:p_sba_id,
+                                last_time:p_last_time,
+				id:key,
+                                user:p_user_id,
+                                item_constant:"client_os",
+                                item_id:p_os_id
+                            }
+                      }
+
+else
+ #---------- insert ------------------------------------------
+        client.index index:"sba-user-profile", type:"user_activity", id:key,
+                body:{
+                        freq:1,
+                        rel_freq:1,
+                        sba_id:p_sba_id,
+                        last_time:p_last_time,
+			id:key,
+                        user:p_user_id,
+                        item_constant:"client_os",
+                        item_id:p_os_id
+			}
+
+
+end # if exist in os
+
+#================== BROWSER statistic ============================================
+key = p_user_id+"#"+"client_browser"+"#"+p_browser_id
+
+if client.exists? index:"sba-user-profile", type:"user_activity", id:key
+then
+        response = client.search index:"sba-user-profile", type:"user_activity",
+                body:{
+                        query:{match:{_id:key}}
+                        }
+
+        response        = response.to_json
+        parsed_response = JSON.parse(response)
+ #------ áttöltés ---------------------------------------------------------
+        result      = parsed_response["hits"]["hits"][0]["_source"]
+
+        p_freq      = parsed_response["hits"]["hits"][0]["_source"]["freq"]
+        p_rel_freq  = parsed_response["hits"]["hits"][0]["_source"]["rel_freq"]
+
+        p_freq      = p_freq.to_f
+        p_rel_freq  = p_rel_freq.to_f
+
+        #------ inkrementálom az adott user osszes aktivitásának a számát --------
+         p_freq+=1
+         p_rel_freq = p_freq/p_number_of_event
+         p_rel_freq = p_rel_freq.to_f
+
+        #-------- update ---------------------------------------------------------
+         client.update index:"sba-user-profile", type:"user_activity", id:key,
+                body:{ doc: {
+                                freq:p_freq,
+                                rel_freq:p_rel_freq,
+                                sba_id:p_sba_id,
+                                last_time:p_last_time,
+				id:key,
+                                user:p_user_id,
+                                item_constant:"client_browser",
+                                item_id:p_browser_id
+                            }
+                      }
+
+else
+ #---------- insert ------------------------------------------
+        client.index index:"sba-user-profile", type:"user_activity", id:key,
+                body:{
+                        freq:1,
+                        rel_freq:1,
+                        sba_id:p_sba_id,
+                        last_time:p_last_time,
+			id:key,
+                        user:p_user_id,
+                        item_constant:"client_browser",
+                        item_id:p_browser_id
+
+                      }
+
+end # if exist in browser
+
+#================== HOUR_OF_DAY statistic ============================================
+key = p_user_id+"#"+"hour_of_day"+"#"+p_hour_of_day
+
+if client.exists? index:"sba-user-profile", type:"user_activity", id:key
+then
+        response = client.search index:"sba-user-profile", type:"user_activity",
+                body:{
+                        query:{match:{_id:key}}
+                        }
+
+        response        = response.to_json
+        parsed_response = JSON.parse(response)
+ #------ áttöltés ---------------------------------------------------------
+        result      = parsed_response["hits"]["hits"][0]["_source"]
+
+        p_freq      = parsed_response["hits"]["hits"][0]["_source"]["freq"]
+        p_rel_freq  = parsed_response["hits"]["hits"][0]["_source"]["rel_freq"]
+
+        p_freq      = p_freq.to_f
+        p_rel_freq  = p_rel_freq.to_f
+
+        #------ inkrementálom az adott user osszes aktivitásának a számát --------
+         p_freq+=1
+         p_rel_freq = p_freq/p_number_of_event
+         p_rel_freq = p_rel_freq.to_f
+
+        #-------- update ---------------------------------------------------------
+         client.update index:"sba-user-profile", type:"user_activity", id:key,
+                body:{ doc: {
+                                freq:p_freq,
+                                rel_freq:p_rel_freq,
+                                sba_id:p_sba_id,
+                                last_time:p_last_time,
+				id:key,
+                                user:p_user_id,
+                                item_constant:"hour_of_day",
+                                item_id:p_hour_of_day			
+                            }
+                      }
+
+else
+ #---------- insert ------------------------------------------
+        client.index index:"sba-user-profile", type:"user_activity", id:key,
+                body:{
+                        freq:1,
+                        rel_freq:1,
+                        sba_id:p_sba_id,
+                        last_time:p_last_time,
+			id:key,
+                        user:p_user_id,
+                        item_constant:"hour_of_day",
+                        item_id:p_hour_of_day			
+                      }
+
+end # if exist in hour_of_day
+
+#================== DAY_OF_MONTH statistic ==========================================
+key = p_user_id+"#"+"day_of_month"+"#"+p_day_of_month
+
+if client.exists? index:"sba-user-profile", type:"user_activity", id:key
+then
+        response = client.search index:"sba-user-profile", type:"user_activity",
+                body:{
+                        query:{match:{_id:key}}
+                        }
+
+        response        = response.to_json
+        parsed_response = JSON.parse(response)
+ #------ áttöltés ---------------------------------------------------------
+        result      = parsed_response["hits"]["hits"][0]["_source"]
+
+        p_freq      = parsed_response["hits"]["hits"][0]["_source"]["freq"]
+        p_rel_freq  = parsed_response["hits"]["hits"][0]["_source"]["rel_freq"]
+
+        p_freq      = p_freq.to_f
+        p_rel_freq  = p_rel_freq.to_f
+
+        #------ inkrementálom az adott user osszes aktivitásának a számát --------
+         p_freq+=1
+         p_rel_freq = p_freq/p_number_of_event
+         p_rel_freq = p_rel_freq.to_f
+
+        #-------- update ---------------------------------------------------------
+         client.update index:"sba-user-profile", type:"user_activity", id:key,
+                body:{ doc: {
+                                freq:p_freq,
+                                rel_freq:p_rel_freq,
+                                sba_id:p_sba_id,
+                                last_time:p_last_time,
+				id:key,
+                                user:p_user_id,
+                                item_constant:"day_of_month",
+                                item_id:p_day_of_month			
+                            }
+                      }
+
+else
+ #---------- insert ------------------------------------------
+        client.index index:"sba-user-profile", type:"user_activity", id:key,
+                body:{
+                        freq:1,
+                        rel_freq:1,
+                        sba_id:p_sba_id,
+                        last_time:p_last_time,
+			id:key,
+                        user:p_user_id,
+                        item_constant:"day_of_month",
+                        item_id:p_day_of_month	
+                      }
+
+end # if exist in day_of_month
+
+
+
+
+#================== IP ==========================================
+key = p_user_id+"#"+"client_ip"+"#"+p_ip_address
+
+if client.exists? index:"sba-user-profile", type:"user_activity", id:key
+then
+        response = client.search index:"sba-user-profile", type:"user_activity",
+                body:{
+                        query:{match:{_id:key}}
+                        }
+
+        response        = response.to_json
+        parsed_response = JSON.parse(response)
+ #------ áttöltés ---------------------------------------------------------
+        result      = parsed_response["hits"]["hits"][0]["_source"]
+
+        p_freq      = parsed_response["hits"]["hits"][0]["_source"]["freq"]
+        p_rel_freq  = parsed_response["hits"]["hits"][0]["_source"]["rel_freq"]
+
+        p_freq      = p_freq.to_f
+        p_rel_freq  = p_rel_freq.to_f
+
+        #------ inkrementálom az adott user osszes aktivitásának a számát --------
+         p_freq+=1
+         p_rel_freq = p_freq/p_number_of_event
+         p_rel_freq = p_rel_freq.to_f
+
+        #-------- update ---------------------------------------------------------
+         client.update index:"sba-user-profile", type:"user_activity", id:key,
+                body:{ doc: {
+                                freq:p_freq,
+                                rel_freq:p_rel_freq,
+                                sba_id:p_sba_id,
+                                last_time:p_last_time,
+                                id:key,
+                                user:p_user_id,
+                                item_constant:"client_ip",
+                                item_id:p_ip_address		
+                            }
+                      }
+
+else
+ #---------- insert ------------------------------------------
+        client.index index:"sba-user-profile", type:"user_activity", id:key,
+                body:{
+                        freq:1,
+                        rel_freq:1,
+                        sba_id:p_sba_id,
+                        last_time:p_last_time,
+                        id:key,
+                        user:p_user_id,
+                        item_constant:"client_ip",
+                        item_id:p_ip_address
+                      }
+
+end # if exist in ip
+
+#--------------------------------------------------------------------------------
+#-------- user_location és a user_prev_location karbantartása -------------------
+#--------------------------------------------------------------------------------
+
+response        = p_geoip
+
+response        = response.to_json
+parsed_response = JSON.parse(response)
+
+#------ áttöltés ---------------------------------------------------------
+p_ip_address		= parsed_response["ip"]
+p_latitude              = parsed_response["latitude"]
+p_longitude             = parsed_response["longitude"]
+p_country_code		= parsed_response["country_code"]
+p_country_name          = parsed_response["country_name"]
+p_region_name           = parsed_response["region_name"]
+p_city_name             = parsed_response["city_name"]
+
+
+=begin
+puts "*********************************************"
+puts p_ip_address
+puts p_latitude
+puts longitude
+puts p_country_code
+puts p_contry_name
+puts p_region_name
+puts p_city_name
+puts "*********************************************"
+=end
+
+
+
+key = p_user_id
+p_prev_ip               = "NA"
+p_prev_longitude        = nil
+p_prev_latitude         = nil
+p_prev_country_code     = "NA"
+p_prev_country_name     = "NA"
+p_prev_region_name      = "NA"
+p_prev_city_name        = "NA"
+p_prev_sba_id           = "NA"
+
+
+
+if client.exists? index:"sba-user-profile", type:"user_location", id:key
+then
+        response = client.search index:"sba-user-profile", type:"user_location",
+                body:{
+                        query:{match:{_id:key}}
+                        }
+
+        response        = response.to_json
+        parsed_response = JSON.parse(response)
+ #------ áttöltés ---------------------------------------------------------
+        result      = parsed_response["hits"]["hits"][0]["_source"]
+       
+        p_prev_ip    		= parsed_response["hits"]["hits"][0]["_source"]["ip"]
+        p_prev_longitude  	= parsed_response["hits"]["hits"][0]["_source"]["longitude"].to_f
+        p_prev_latitude  	= parsed_response["hits"]["hits"][0]["_source"]["latitude"].to_f
+        p_prev_country_code  	= parsed_response["hits"]["hits"][0]["_source"]["country_code"]
+        p_prev_country_name  	= parsed_response["hits"]["hits"][0]["_source"]["country_name"]
+        p_prev_region_name  	= parsed_response["hits"]["hits"][0]["_source"]["region_name"]
+        p_prev_city_name  	= parsed_response["hits"]["hits"][0]["_source"]["city_name"]
+        p_prev_sba_id  		= parsed_response["hits"]["hits"][0]["_source"]["sba_id"]
+ 	p_prev_last_time	= parsed_response["hits"]["hits"][0]["_source"]["Last_time"]
+ 
+        #-------- update ---------------------------------------------------------
+         client.update index:"sba-user-profile", type:"user_location", id:key,
+                body:{ doc: {
+                                ip:p_ip_address,
+                                latitude:p_longitude,
+                                longitude:p_latitude,
+                                country_code:p_country_code,
+                                country_name:p_country_name,
+                                region_name:p_region_name,
+                                city_name:p_city_name,
+                                id:key,
+				user_id:key,
+				sba_id:p_sba_id,
+				last_time:p_last_time
+                            }
+                      }
+
+else
+ #---------- insert ------------------------------------------
+        client.index index:"sba-user-profile", type:"user_location", id:key,
+                body:{
+                                ip:p_ip_address,
+                                latitude:p_longitude,
+                                longitude:p_latitude,
+                                country_code:p_country_code,
+                                country_name:p_country_name,
+                                region_name:p_region_name,
+                                city_name:p_city_name,
+                                id:key,
+                                user_id:key,
+                                sba_id:p_sba_id,
+				last_time:p_last_time
+                      }
+end # if exist in user_location
+
+
+
+#---------- prev_location aktualizálása ------------------------------------------
+        client.index index:"sba-user-profile", type:"user_prev_location", id:key,
+                body:{
+                                prev_ip:p_prev_ip,
+                                prev_latitude:p_prev_longitude,
+                                prev_longitude:p_prev_latitude,
+                                prev_country_code:p_prev_country_code,
+                                prev_country_name:p_prev_country_name,
+                                prev_region_name:p_prev_region_name,
+                                prev_city_name:p_prev_city_name,
+                                id:key,
+                                user_id:key,
+                                prev_sba_id:p_prev_sba_id
+
+                      }
+
+
+
+' # code
+
+} # ruby
+
+
+
+
+
+#------------ remove fields sction -------------------------------------------------
+#	mutate {
+#		 remove_field => ["@version",
+#				  "@timestamp",
+#				  "host",
+#				  "path"]
+#		} # mutate
+
+
+} # filter
+
+
+
+        
+output {
+         stdout{ codec=>json }							 
+
+
+         elasticsearch { codec => json
+                         hosts => ["127.0.0.1:9200"]
+                         index => "sba_original-%{+YYYY.MM.dd}"
+                       }
+
+}

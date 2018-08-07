@@ -1,0 +1,91 @@
+#!/bin/bash 
+#------------------------------------------------------------------------------------
+#
+#       
+#       
+#			
+#       Code Name       : Coney_marci 1.1
+#       
+#	Description     : 
+#       		 A coney_inf egy olyan mutációja, amelyen a Marci-féle
+#       		 ES look uphoz generálunk input stream-et.
+#	
+#	 
+#	
+#       
+#
+#       Author          : Istvan Diosi (www.szofiUSA.com)
+#       Created         : 2016.08.08
+#       Modify          : 
+#                         
+#                         
+#                         
+#                         
+#                         
+#
+#------------------------------------------------------------------------------------
+
+# ================== global variables ===============================================
+sp1=' '
+sp2='  '
+coma=','
+#====================================================================================
+#----------- Forrásrendszer-logfileok mérete ----------------------------------------
+usr_rnd_linesize=$(cat ./user_rnd.lgdb |wc -l)
+#------------------------------------------------------------------------------------
+#----------- Forrásrendszer-logfileok száma  ----------------------------------------
+number_of_source=1
+#------------------------------------------------------------------------------------
+#----------- segéd fileok mérete ----------------------------------------------------
+# userfilesize=$(cat ./lgtemplate/user.lgdb |wc -l)
+# ipfilesize=$(cat ./lgtemplate/ip.lgdb |wc -l)
+#------------------------------------------------------------------------------------
+function get_message
+ {
+             # ------ get date ------------------------------------
+             # datum=$(date -R)
+             # ------ get logmessage ------------------------------
+             msglinenumber=$(((RANDOM % $msgfilesize)+1))
+             lgtxt=$(cat  ./${SOURCE} |sed -n $msglinenumber' p')
+             # ----------------------------------------------------
+             # ------ get ip --------------------------------------
+             # iplinenumber=$(((RANDOM % $ipfilesize)+1))
+             # ip=$(cat  ./lgtemplate/ip.lgdb |sed -n $iplinenumber' p')
+             # ----------------------------------------------------
+             # ------ get user ------------------------------------
+             # userlinenumber=$(((RANDOM % $userfilesize)+1))
+             # user=$(cat  ./lgtemplate/user.lgdb |sed -n $userlinenumber' p')
+             # ----------------------------------------------------
+             echo $lgtxt >> user_input_strm.lg
+}
+
+
+while true 
+do
+        
+i=$(((RANDOM % $number_of_source)+1))
+
+case $i in
+    1)
+    	SOURCE="user_rnd.lgdb"
+        msgfilesize=$usr_rnd_linesize
+        get_message
+    ;;
+    
+    2)
+    	SOURCE="payment.lgdb"
+        msgfilesize=$payment_linesize
+        get_message
+    ;;
+    3)
+        SOURCE="swift.lgdb"
+        msgfilesize=$swift_linesize
+        get_message
+    ;;
+    4)
+        SOURCE="apollo.lgdb"
+        msgfilesize=$apollo_linesize
+        get_message
+    ;;
+ esac
+done

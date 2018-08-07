@@ -1,0 +1,63 @@
+#!/bin/sh
+#------------------------------------------------------------------------------------
+#
+#	A script a logbejegyzéseket generál adott paraméterezéssel.
+#	Tesztelési segédeszközként készült, egy ELK architektúrához
+#
+#       Code Name	: Coney 1.1 
+#	Description	:
+#       A script a logbejegyzéseket generál adott paraméterezéssel.
+#       A scriptet az asm-logger nevű paraméterekre bekonfigurált vezérlő hívja meg
+#
+#	Author		: Istvan Diosi (www.szofiUSA.com)
+#	Created		: 2016.07.21
+#	Modify		: 2016.07.22 lgdb-k befűzése
+#                         2016.07.23 a 1.1 es eltérése az 1.0-hoz
+#			             képest, hogy a randomizálás módszerét
+#                                    a filesor permutálás helyett a random-ra cseréltem.
+#				     Gyorsabb nem lett, viszont a val. változó transzformá-
+#				     ciójának a lehetősége így adott lett.
+#				    	 
+#------------------------------------------------------------------------------------
+# ================== global variables ==================================
+sp1=' '
+sp2='  '
+coma=','
+#=======================================================================   
+
+counter=0
+datum=''
+lgtxt=''
+user=''
+ip=''
+msglinenumber=1
+userlinenumber=1
+iplinenumber=1
+ #-------------- file-specifikus alapváltozok feltöltése -------------- 
+ msgfilesize=$(cat ./lgtemplate/equation.lgdb |wc -l) 
+ userfilesize=$(cat ./lgtemplate/user.lgdb |wc -l)
+ ipfilesize=$(cat ./lgtemplate/ip.lgdb |wc -l)
+ #---------------------------------------------------------------------
+
+
+  while [  $counter -lt 1000 ]; 
+         do
+             # ------ get date ------------------------------------
+             datum=$(date -R)
+             # ------ get logmessage ------------------------------
+             msglinenumber=$(((RANDOM % $msgfilesize)+1))
+             lgtxt=$(cat  ./lgtemplate/equation.lgdb |sed -n $msglinenumber' p')
+             # ----------------------------------------------------
+             # ------ get ip --------------------------------------
+             iplinenumber=$(((RANDOM % $ipfilesize)+1))
+             ip=$(cat  ./lgtemplate/ip.lgdb |sed -n $iplinenumber' p')
+             # ----------------------------------------------------
+             # ------ get user ------------------------------------
+              userlinenumber=$(((RANDOM % $userfilesize)+1))
+              user=$(cat  ./lgtemplate/user.lgdb |sed -n $userlinenumber' p')
+             # ----------------------------------------------------
+             echo $datum$sp1$lgtxt$sp1$ip$sp1$user >> asm_test.log
+             let counter=counter+1 
+         done
+
+

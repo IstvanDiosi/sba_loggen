@@ -1,0 +1,216 @@
+#!/bin/bash 
+#------------------------------------------------------------------------------------
+#
+#       A script a logbejegyzéseket generál adott paraméterezéssel.
+#       Tesztelési segédeszközként készült, egy ELK architektúrához
+#
+#       Code Name       : Coney_inf(inite) 1.1
+#       Description     : 
+#       A script a logsource-okból, amelyek az adott alaprendszer üzeneteit tartalmazzzák
+#       és olyan segédfájlokból, mint az ip.lgdb és a user.lgdb tetszőlegesen kialakítható
+#				logüzeneteket generál, végtelen ciklusban.
+#				A kód a Bklyn szotochasztikus folymatanalíziséhez írt kód egy részletének 
+#				leegyszerűsítése.
+#       indítás praktikusan: nohup ./coney > /dev/null 2>&1 &
+#
+#       Author          : Istvan Diosi (www.szofiUSA.com)
+#       Created         : 2016.07.21
+#       Modify          : 2016.07.22 lgdb-k befűzése
+#                         2016.07.26 KH-ban történő telepítés                         
+#                          
+#                              
+#                         
+#                         
+#
+#------------------------------------------------------------------------------------
+# ================== global variables ===============================================
+sp1=' '
+sp2='  '
+coma=','
+#====================================================================================
+#----------- Forrásrendszer-logfileok mérete ----------------------------------------
+ equation_linesize=$(cat ./lgtemplate/equation.lgdb |wc -l)
+ payment_linesize=$(cat ./lgtemplate/payment.lgdb |wc -l)
+ swift_linesize=$(cat ./lgtemplate/swift.lgdb |wc -l)
+ apollo_linesize=$(cat ./lgtemplate/apollo.lgdb |wc -l)
+ ad_linesize=$(cat ./lgtemplate/ad.lgdb |wc -l)
+ biztosnet_linesize=$(cat ./lgtemplate/biztosnet.lgdb |wc -l)
+ cmdb_linesize=$(cat ./lgtemplate/cmdb.lgdb |wc -l)
+ dwh_linesize=$(cat ./lgtemplate/dwh.lgdb |wc -l)
+ eBank_linesize=$(cat ./lgtemplate/eBank.lgdb |wc -l)
+ edma_linesize=$(cat ./lgtemplate/edma.lgdb |wc -l)
+ electra_linesize=$(cat ./lgtemplate/electra.lgdb |wc -l)
+ isam_linesize=$(cat ./lgtemplate/isam.lgdb |wc -l)
+ kfka_linesize=$(cat ./lgtemplate/kfka.lgdb |wc -l)
+ mhc_linesize=$(cat ./lgtemplate/mhc.lgdb |wc -l)
+ mobilbank_linesize=$(cat ./lgtemplate/mobilbank.lgdb |wc -l)
+ oid_linesize=$(cat ./lgtemplate/oid.lgdb |wc -l)
+ sap_linesize=$(cat ./lgtemplate/sap.lgdb |wc -l)
+ tameb_linesize=$(cat ./lgtemplate/tameb.lgdb |wc -l)
+ ucv_linesize=$(cat ./lgtemplate/ucv.lgdb |wc -l)
+ website_linesize=$(cat ./lgtemplate/website.lgdb |wc -l)
+ zeus_linesize=$(cat ./lgtemplate/zeus.lgdb |wc -l)
+ pymntgate_linesize=$(cat ./lgtemplate/pymntgate.lgdb |wc -l)
+
+#------------------------------------------------------------------------------------
+#----------- Forrásrendszer-logfileok száma  ----------------------------------------
+number_of_source=22
+filesize=0
+#------------------------------------------------------------------------------------
+#----------- segéd fileok mérete ----------------------------------------------------
+userfilesize=$(cat ./lgtemplate/user.lgdb |wc -l)
+ipfilesize=$(cat ./lgtemplate/ip.lgdb |wc -l)
+#------------------------------------------------------------------------------------
+function get_message
+ {
+             # ------ get date ------------------------------------
+             datum=$(date -R)
+             # ------ get logmessage ------------------------------
+             msglinenumber=$(((RANDOM % $msgfilesize)+1))
+             lgtxt=$(cat  ./lgtemplate/${SOURCE} |sed -n $msglinenumber' p')
+             # ----------------------------------------------------
+             # ------ get ip --------------------------------------
+             iplinenumber=$(((RANDOM % $ipfilesize)+1))
+             ip=$(cat  ./lgtemplate/ip.lgdb |sed -n $iplinenumber' p')
+             # ----------------------------------------------------
+             # ------ get user ------------------------------------
+              userlinenumber=$(((RANDOM % $userfilesize)+1))
+              user=$(cat  ./lgtemplate/user.lgdb |sed -n $userlinenumber' p')
+             # ----------------------------------------------------
+ 	      echo $datum$sp1$lgtxt$sp1$ip$sp1$user >> tempor.lg
+}
+
+
+while true 
+do
+#---------- tempor.lg méretének kordábantartása --------------        
+              filesize=$((filesize+1))
+            
+              if [ $filesize = 5000 ] ; then
+                   rm tempor.lg
+									 filesize=0									
+               fi
+#-------------------------------------------------------------
+i=$(((RANDOM % $number_of_source)+1))
+
+case $i in
+    1)
+    	SOURCE="equation.lgdb"
+        msgfilesize=$equation_linesize
+        get_message
+    ;;
+    
+    2)
+    	SOURCE="payment.lgdb"
+        msgfilesize=$payment_linesize
+        get_message
+    ;;
+    3)
+        SOURCE="swift.lgdb"
+        msgfilesize=$swift_linesize
+        get_message
+    ;;
+    4)
+        SOURCE="apollo.lgdb"
+        msgfilesize=$apollo_linesize
+        get_message
+    ;;
+    5)
+        SOURCE="ad.lgdb"
+        msgfilesize=$ad_linesize
+        get_message
+    ;;
+    6)
+        SOURCE="biztosnet.lgdb"
+        msgfilesize=$biztosnet_linesize
+        get_message
+    ;;
+    7)
+        SOURCE="cmdb.lgdb"
+        msgfilesize=$cmdb_linesize
+        get_message
+    ;;
+    8)
+        SOURCE="dwh.lgdb"
+        msgfilesize=$dwh_linesize
+        get_message
+    ;;
+    9)
+        SOURCE="eBank.lgdb"
+        msgfilesize=$eBank_linesize
+        get_message
+    ;;
+    10)
+        SOURCE="edma.lgdb"
+        msgfilesize=$edma_linesize
+        get_message
+    ;;
+    11)
+        SOURCE="electra.lgdb"
+        msgfilesize=$electra_linesize
+        get_message
+    ;;
+
+    12)
+        SOURCE="isam.lgdb"
+        msgfilesize=$isam_linesize
+        get_message
+    ;;
+    13)
+        SOURCE="kfka.lgdb"
+        msgfilesize=$kfka_linesize
+        get_message
+    ;;
+    14)
+        SOURCE="mhc.lgdb"
+        msgfilesize=$mhc_linesize
+        get_message
+    ;;
+    15)
+        SOURCE="mobilbank.lgdb"
+        msgfilesize=$mobilbank_linesize
+        get_message
+    ;;
+    16)
+        SOURCE="oid.lgdb"
+        msgfilesize=$oid_linesize
+        get_message
+    ;;
+    17)
+        SOURCE="sap.lgdb"
+        msgfilesize=$sap_linesize
+        get_message
+    ;;
+    18)
+        SOURCE="tameb.lgdb"
+        msgfilesize=$tameb_linesize
+        get_message
+    ;;
+    19)
+        SOURCE="tameb.lgdb"
+        msgfilesize=$tameb_linesize
+        get_message
+    ;;
+    20)
+        SOURCE="website.lgdb"
+        msgfilesize=$website_linesize
+        get_message
+    ;;
+    21)
+        SOURCE="zeus.lgdb"
+        msgfilesize=$zeus_linesize
+        get_message
+    ;;
+    22)
+        SOURCE="pymntgate.lgdb"
+        msgfilesize=$pymntgate_linesize
+        get_message
+    ;;
+
+
+
+
+
+
+ esac
+done

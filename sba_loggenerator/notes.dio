@@ -1,0 +1,3 @@
+
+A loggen-test* ba szúrok be. Ha törölni akarok, akkor emígyen:
+curl -XDELETE 'http://10.233.185.14:9200/loggen-test*/'

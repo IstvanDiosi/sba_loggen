@@ -1,0 +1,4 @@
+RULE_USER (?<user>[xywXYW][0-9]{5})
+RULE_OS (?<os>(Windows7|Windows10|Windows8|WindowsXP|LinuxUbuntuDesktop|MAcOS8|MAcOS9|iOS10|android))
+RULE_DEVICE (?<device>DEV[0-9]{5})
+RULE_BROWSER (?<browser>(Chrome|IExplorer11|IExplorer10|Firefox|Safari|Opera))

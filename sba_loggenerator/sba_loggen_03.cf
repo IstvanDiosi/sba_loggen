@@ -1,0 +1,210 @@
+#       File            : loggen_test.cf
+#       -----------------------------------------------------------------------------          
+#       Start           : nohup /opt/logstash/bin/logstash -f /opt/ASM/cfg/logstash/loggen_test.cf > /dev/null 2>&1 &
+#       -----------------------------------------------------------------------------
+#       Description     : A coney_inf loggenertator által előállított tesztrekordokat szúrja
+#													be az Elasticsearch-be. 
+#       -----------------------------------------------------------------------------
+#       input           : /home/u95873/loggenerator/tempor.lg A loggenerátor output file-ja
+#       output          : Elasticsearch (10.233.185.14)
+#       filterek        : geoip, translate, ASM_ID generalas
+#       ----------------------------------------------------------------------------
+#       Author          : Istvan Diosi (www.szofiUSA.com)
+#       Created         : 2016.07.21
+#       Modify          : 2016.07.22 lgdb-k befűzése
+#                         2016.07.26 KH-ban történő telepítés
+#                         2016.08.16 ASM_ID generáló ruby script befűzése
+#
+#
+#
+#
+#------------------------------------------------------------------------------------
+input {
+ file {
+	# path => "/home/diosiistvan/sba/sba_loggenerator/sba_tempor.lg"
+	path => "C:\cygwin64\home\diosiistvan\sba\sba_loggenerator\sba_tempor.lg"
+        start_position => beginning
+        ignore_older => 0 
+    }
+}
+
+
+# geoip path /usr/share/GeoIP
+
+ filter {
+
+	#------------------------ IP infók ---------------------------------------------------------
+          grok {
+		#https://github.com/elastic/logstash/blob/v1.4.2/patterns/grok-patterns
+
+                   match => { "message" => "%{IPV4:ip_address}" }
+               }
+
+          grok {
+    
+                match => { "message" => "%{MONTH:month}" }
+    
+
+               }
+          grok {
+                    match => { "message" => "%{DAY:day}" }
+    
+               }
+          grok {
+                    match => { "message" => "%{MONTHDAY:month_day}" }
+
+               }
+
+
+	grok {
+         	 patterns_dir => "C:\cygwin64\home\diosiistvan\sba\sba_loggenerator\pattern_lib"
+                 match => { "message" => "%{RULE_USER:user_id}" }
+	      }
+
+        grok {
+                 patterns_dir => "C:\cygwin64\home\diosiistvan\sba\sba_loggenerator\pattern_lib"
+                 match => { "message" => "%{RULE_OS:os_id}" }
+              }
+
+        grok {
+                 patterns_dir => "C:\cygwin64\home\diosiistvan\sba\sba_loggenerator\pattern_lib"
+                 match => { "message" => "%{RULE_DEVICE:device_id}" }
+              }
+
+        grok {
+                 patterns_dir => "C:\cygwin64\home\diosiistvan\sba\sba_loggenerator\pattern_lib"
+                 match => { "message" => "%{RULE_BROWSER:browser_id}" }
+              }
+
+       grok {
+                 patterns_dir => "C:\cygwin64\home\diosiistvan\sba\sba_loggenerator\pattern_lib"
+                 match => { "message" => "%{RULE_HOUR:hour_of_day}" }
+              }
+
+
+       grok {
+                 patterns_dir => "C:\cygwin64\home\diosiistvan\sba\sba_loggenerator\pattern_lib"
+                 match => { "message" => "%{RULE_DAY:day_of_month}" }
+              }
+
+
+        geoip {
+                        source => "ip_address"
+                        target => "geoip"
+			database => "C:\cygwin64\usr\share\GeoIP\GeoLite2-City.mmdb"
+                      #  database => "C:\cygwin64\usr\share\GeoIP\GeoLiteCity.dat"
+                        add_field => [ "[geoip][coordinates]", "%{[geoip][longitude]}" ]
+                        add_field => [ "[geoip][coordinates]", "%{[geoip][latitude]}"  ]
+                }
+
+        mutate {
+                        convert => [ "[geoip][coordinates]", "float"]
+                }
+
+
+       #------------------------ event_id ---------------------------------------------------------
+ ruby {
+      init => "require 'time'"
+      code => 'id="#"
+            time = Time.new
+idtime = (time.year).to_s + (time.month).to_s + (time.day).to_s + (time.hour).to_s + (time.min).to_s + (time.sec).to_s + (time.usec).to_s
+                i = 0
+                while i<10 do
+                        rcode=rand(57)+65
+                        case rcode
+                                when 65..90
+                                        sid=rcode.chr()
+                                        id=id+sid
+                                        i+=1
+                                when 97..122
+                                        sid=rcode.chr()
+                                        id=id+sid
+                                        i+=1
+                        end
+                end
+	   event.set("sba_id",idtime + id)
+           '
+         } #ruby
+
+
+
+# --------- sba-user-profile/user updatelése -----------------------------------------
+
+ruby {
+	init => "require 'rubygems'
+		  require 'elasticsearch'
+		  require 'json'"
+code =>'
+
+p_user_id = event.get("user_id")
+
+client = Elasticsearch::Client.new host:"127.0.0.1:9200"
+
+
+if client.exists? index:"sba-user-profile", type:"user", id:p_user_id
+then
+
+        #---------- update --------------------------------------------------------
+        # kiolvasom a létező rekordot és áttöltöm a releváns változótartalmakat
+        #--------------------------------------------------------------------------
+        response = client.search index:"sba-user-profile", type:"user",
+                body:{
+                        query:{match:{_id:p_user_id}}
+                        }
+
+        response        = response.to_json
+        parsed_response = JSON.parse(response)
+
+        #------ áttöltés ---------------------------------------------------------
+        result                  = parsed_response["hits"]["hits"][0]["_source"]
+        p_number_of_event       = parsed_response["hits"]["hits"][0]["_source"]["number_of_event"]
+	
+        #------ inkrementálom az adott user osszes aktivitásának a számát --------
+         p_number_of_event+=1
+
+        #-------- update ---------------------------------------------------------
+         client.update index:"sba-user-profile", type:"user", id:p_user_id,
+                body:{ doc: {
+                                number_of_event:p_number_of_event
+                            }
+                      }
+else
+#---------- insert ------------------------------------------
+ client.index index:"sba-user-profile", type:"user", id:p_user_id,
+                body:{
+                         number_of_event:1
+                      }
+end
+
+' # code
+
+} # ruby
+
+
+
+
+
+#------------ remove fields sction -------------------------------------------------
+#	mutate {
+#		 remove_field => ["@version",
+#				  "@timestamp",
+#				  "host",
+#				  "path"]
+#		} # mutate
+
+
+} # filter
+
+
+
+        
+output {
+         stdout{ codec=>json }							 
+
+
+         elasticsearch { codec => json
+                         hosts => ["127.0.0.1:9200"]
+                         index => "sba_original-%{+YYYY.MM.dd}"
+                       }
+
+}

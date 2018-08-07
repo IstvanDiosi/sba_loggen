@@ -1,0 +1,6 @@
+#-------------------------------------------------------------------
+# Ez egy bonyolultabb schell script, a loggenerator dockerizálva
+#-------------------------------------------------------------------
+FROM ubuntu
+MAINTAINER istvan.diosi@gmail.com
+RUN ./sba_inf

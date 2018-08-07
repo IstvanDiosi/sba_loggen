@@ -1,0 +1,26 @@
+for i in "$@"
+do
+case $i in
+    -s=*|--source=*)
+    SOURCE="${i#*=}"
+    shift # past argument=value
+    ;;
+    -n=*|--numberofms=*)
+    NUMBEROFMSG="${i#*=}"
+    shift # past argument=value
+    ;;
+    -d=*|--delay=*)
+    DELAY="${i#*=}"
+    shift # past argument=value
+    ;;
+esac
+done
+echo "SOURCE  			= ${SOURCE}"
+echo "NUMBER OF MESSAGE     	= ${NUMBEROFMSG}"
+echo "DELAY		    	= ${DELAY}"
+
+# echo "Number files in SEARCH PATH with EXTENSION:" $(ls -1 "${SEARCHPATH}"/*."${EXTENSION}" | wc -l)
+# if [[ -n $1 ]]; then
+#    echo "Last line of file specified as non-opt/last argument:"
+#    tail -1 $1
+#fi
